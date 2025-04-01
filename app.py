@@ -1,11 +1,14 @@
+import asyncio
+
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 import streamlit as st
 import random
 import time
 from transformers import pipeline
-
-import asyncio
-if asyncio.get_event_loop().is_closed():
-    asyncio.set_event_loop(asyncio.new_event_loop())
 
 # Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
 
