@@ -1,9 +1,12 @@
 import asyncio
 
+# Ensure a running event loop
 try:
     asyncio.get_running_loop()
 except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 
 import streamlit as st
 import random
@@ -88,8 +91,9 @@ if st.button("Send") and user_input:
 
     st.session_state.history += "\n" + prompt
     
-    # Generate a response using the chatbot engine
-    response_data = chatbot(prompt, max_length=150, do_sample=True, temperature=0.8)
+    # Generate a response using the chatbot engine  model.generate(input_ids, max_length=150, truncation=True)
+
+    response_data = chatbot(prompt, max_length=150, do_sample=True, temperature=0.8, truncation=True)
     response = response_data[0]['generated_text'].split(f"{current_personality}:")[-1].strip()
     
     # Display the response
