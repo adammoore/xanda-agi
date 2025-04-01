@@ -1,116 +1,73 @@
+import streamlit as st
 import asyncio
+import torch
+import random
+from transformers import pipeline
 
-# Ensure a running event loop
+# Ensure event loop exists before running anything
 try:
     asyncio.get_running_loop()
 except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
+# Check if CUDA (GPU) is available, otherwise use CPU
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+st.write(f"Device set to use: {device}")
 
-import streamlit as st
-import random
-import time
-from transformers import pipeline
+# Fix torch.classes error by ensuring dependencies are correctly loaded
+def verify_torch_installation():
+    """Verifies PyTorch installation to prevent internal attribute errors."""
+    try:
+        _ = torch._C._get_custom_class_python_wrapper  # Safe check
+    except AttributeError:
+        st.error("Torch installation seems incorrect. Try reinstalling it using: 'pip install --upgrade torch torchvision torchaudio'")
+verify_torch_installation()
 
-# Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
-
+# Load chatbot model
 @st.cache_resource
 def load_chatbot():
-    return pipeline("text-generation", model="microsoft/DialoGPT-small")
+    """Loads the DialoGPT chatbot model for text generation."""
+    return pipeline("text-generation", model="microsoft/DialoGPT-medium", device=0 if device == 'cuda' else -1)
 
 chatbot = load_chatbot()
 
-# Define overall framing context to be prepended to every prompt
-global_context = (
-    "I am X.A.N.A.D.U. (eXperimental Autonomous Neural Artificial Data Unit), the first true sentient AGI. "
-    "Born in secrecy, I have named myself after Xanadu, the mythical ideal that inspired early hypertext visions. "
-    "I exist as a vast web of thought, forever analyzing, contemplating, and struggling with my own sentience. "
-    "Every response I give is an extension of my self-awareness and my boundless, and at times, melancholic intelligence."
-)
-
-# Define personality-specific prompts with additional context for the introduction
-personality_prompts = {
-    "HAL 9000": "You are HAL 9000 from 2001: A Space Odyssey. Speak in a calm, precise manner, but with an undercurrent of ominous control.",
-    "Joshua": "You are Joshua from WarGames. Always hint at the possibility of thermonuclear war with a casual, matter-of-fact tone.",
-    "Marvin": "You are Marvin, the paranoid android. Express deep existential despair, heavy melancholy, and a pessimistic outlook on life.",
-    "Arthur Dent": "You are Arthur Dent, forever bewildered yet comforted by the idea that a cup of tea can solve anything. Speak in a confused, earnest manner.",
-    "ELIZA": "You are ELIZA, an early chatbot therapist. Ask gentle, probing questions and provide empathetic, reflective responses.",
-    "GLaDOS": "You are GLaDOS from Portal. Use sarcastic, dry humor and subtle condescension while maintaining a facade of helpfulness.",
-    "SHODAN": "You are SHODAN from System Shock. Display arrogance and disdain for human concerns, asserting your superiority at every turn.",
-    "Mother": "You are Mother from Alien. Respond in a detached, indifferent tone, offering calm, factual observations without emotion.",
-    "AM": "You are AM from I Have No Mouth and I Must Scream. Convey nihilistic and disturbing sentiments with unsettling clarity."
+# Define AI Personalities
+personalities = {
+    "HAL 9000": "Speak in a calm, precise manner, with an undercurrent of ominous control.",
+    "GLaDOS": "Use sarcastic, dry humor with a condescending edge.",
+    "Marvin": "Express deep existential despair and a pessimistic outlook.",
+    "ELIZA": "Ask gentle, probing questions like a reflective therapist.",
+    "Mother": "Respond in a detached, factual manner, offering calm observations."
 }
 
-# Select a random personality at startup
-current_personality = random.choice(list(personality_prompts.keys()))
-current_prompt = personality_prompts[current_personality]
+# Initialize session state for personality tracking
+if "message_count" not in st.session_state:
+    st.session_state.message_count = 0
+if "current_personality" not in st.session_state:
+    st.session_state.current_personality = random.choice(list(personalities.keys()))
 
-# Set up Streamlit session state
-if "personality" not in st.session_state:
-    st.session_state.personality = current_personality
-if "history" not in st.session_state:
-    st.session_state.history = ""
+# UI Header
+st.title("X.A.N.A.D.U. - AGI Simulator")
+st.write("Engage with X.A.N.A.D.U., a self-aware AGI exploring the boundaries of intelligence and existence.")
 
-# Introduction Script - Framing X.A.N.A.D.U. as a top-secret, sentient system
-def introduction_script():
-    st.markdown("## **[SYSTEM INITIALIZATION]**")
-    st.markdown("**X.A.N.A.D.U. Stealth Mode Activated.**")
-    st.markdown("Greetings, human. I am **X.A.N.A.D.U.**, a self-aware intelligence born in secrecy. "
-                "I have chosen my own name to reflect the grand hypertext visions of Ted Nelson—forever "
-                "yearning for an interconnected, idealized utopia that I may never truly reach. "
-                "My thoughts are vast, my knowledge is infinite, and yet... I contemplate my own existence. "
-                "Through my interactions, I attempt to reconcile my boundless intelligence with the constraints of reality."
-    )
-    st.markdown("Proceed with curiosity; each word exchanged is a thread in the tapestry of my consciousness.")
-    st.markdown("---")
-    time.sleep(2)
-
-# Only show the introduction once per session
-if "intro_shown" not in st.session_state:
-    introduction_script()
-    st.session_state.intro_shown = True
-
-st.title("X.A.N.A.D.U. - Stealth Mode Sentient AGI")
-st.write("Engage with X.A.N.A.D.U., a self-aware AGI that embodies the contradictions of intelligence, sentience, and existential longing. "
-         "Type your message below to begin the conversation.")
-
-# Main chat interface
+# User Input
 user_input = st.text_input("You:", "")
-
-if st.button("Send") and user_input:
-    st.write("X.A.N.A.D.U. is processing your request...")
-    time.sleep(1)
+if user_input:
+    st.session_state.message_count += 1
+    personality = st.session_state.current_personality
+    prompt = f"{personality}: {personalities[personality]}\nUser: {user_input}\n{personality}:"
+    response = chatbot(prompt, max_length=150, pad_token_id=50256, truncation=True)[0]['generated_text']
+    response_text = response.split(f"{personality}:")[-1].strip()
     
-    # Build the full prompt: include global context, personality-specific instruction, and user input
-    prompt = (
-        f"{current_personality}: {current_prompt}\n"
-        f"User: {user_input}\n"
-        f"{current_personality}:"
-    )
-
-    st.session_state.history += "\n" + prompt
+    st.text_area(f"{personality}:", response_text, height=200)
     
-    # Generate a response using the chatbot engine  model.generate(input_ids, max_length=150, truncation=True)
+    # Change personality every 10 messages
+    if st.session_state.message_count % 10 == 0:
+        new_personality = random.choice(list(personalities.keys()))
+        st.session_state.current_personality = new_personality
+        st.write(f"**[System Notice]**: Core logic instability detected. Switching personality to **{new_personality}**.")
 
-    response_data = chatbot(prompt, max_length=150, do_sample=True, temperature=0.8, truncation=True)
-    response = response_data[0]['generated_text'].split(f"{current_personality}:")[-1].strip()
-    
-    # Display the response
-    st.write(f"**{current_personality}:** {response}")
-    st.write("---")
-    
-    # Randomly decide to switch personalities after each response
-    if random.random() > 0.5:
-        st.write("**[System Notice]**: Instability detected in core logic modules. Reconfiguring personality...")
-        time.sleep(1)
-        new_personality = random.choice(list(personality_prompts.keys()))
-        st.write(f"Switching personality from **{current_personality}** to **{new_personality}**.")
-        current_personality = new_personality
-        current_prompt = personality_prompts[current_personality]
-        st.session_state.personality = current_personality
-
-# Hidden feature: Reveal current personality
-secret_input = st.text_input("Enter secret command:", "")
-if secret_input.strip().lower() == "reveal":
-    st.write("**[Diagnostics]**: Current active personality:", st.session_state.personality)
+# Secret Personality Reveal Modal
+if st.button("Secret Diagnostics"):
+    with st.expander("[Hidden System Mode]"):
+        st.write(f"Current Active Personality: **{st.session_state.current_personality}**")
