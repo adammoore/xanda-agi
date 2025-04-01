@@ -4,7 +4,11 @@ import time
 from transformers import pipeline
 
 # Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
-@st.cache_resource
+import asyncio
+if asyncio.get_event_loop().is_closed():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+st.cache_resource
 def load_chatbot():
     return pipeline("text-generation", model="microsoft/DialoGPT-medium")
 
