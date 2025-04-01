@@ -3,6 +3,10 @@ import random
 import time
 from transformers import pipeline
 
+import asyncio
+if asyncio.get_event_loop().is_closed():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 # Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
 
 @st.cache_resource
@@ -74,16 +78,16 @@ if st.button("Send") and user_input:
     
     # Build the full prompt: include global context, personality-specific instruction, and user input
     prompt = (
-        f"{global_context}\n"
-        f"{current_prompt}\n"
+        f"{current_personality}: {current_prompt}\n"
         f"User: {user_input}\n"
         f"{current_personality}:"
     )
+
     st.session_state.history += "\n" + prompt
     
     # Generate a response using the chatbot engine
     response_data = chatbot(prompt, max_length=150, do_sample=True, temperature=0.8)
-    response = response_data[0]['generated_text']
+    response = response_data[0]['generated_text'].split(f"{current_personality}:")[-1].strip()
     
     # Display the response
     st.write(f"**{current_personality}:** {response}")
