@@ -5,9 +5,9 @@ from transformers import pipeline
 
 # Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
 
-st.cache_resource
+@st.cache_resource
 def load_chatbot():
-    return pipeline("text-generation", model="microsoft/DialoGPT-medium")
+    return pipeline("text-generation", model="microsoft/DialoGPT-small")
 
 chatbot = load_chatbot()
 
