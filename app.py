@@ -4,7 +4,11 @@ import time
 from transformers import pipeline
 
 # Initialize the chatbot engine using Hugging Face's DialoGPT-medium model
-chatbot = pipeline("text-generation", model="microsoft/DialoGPT-medium")
+@st.cache_resource
+def load_chatbot():
+    return pipeline("text-generation", model="microsoft/DialoGPT-medium")
+
+chatbot = load_chatbot()
 
 # Define overall framing context to be prepended to every prompt
 global_context = (
